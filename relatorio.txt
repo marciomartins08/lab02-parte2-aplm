@@ -1,0 +1,103 @@
+Para localizares essa mensagem no Logcat:
+1. Executa a tua aplicação no Android Studio.
+2. Abre a aba Logcat (Alt + 6).
+3. Na barra de pesquisa do Logcat, escreve:
+   MainActivity
+4. Deverás encontrar uma mensagem semelhante a:
+   	D/MainActivity: Aplicação iniciada com sucesso.
+
+O que significa cada parte?
+- D — Debug (nível da mensagem).
+- MainActivity — Tag que definiste no Log.d().
+- Aplicação iniciada com sucesso. — Mensagem que será apresentada.
+
+O LocalContext é a forma de o Jetpack Compose te dar acesso ao Context do Android dentro de uma função @Composable.
+
+O context e um objecto q da acesso a coisas do sistema, como mostrar um Toast, abrir outra activity, acessar recursos(strings, imagens, cores), acessar SharedPreferences, arquivos, servicos do sistema, etc.
+
+Toast é uma mensagem rápida e temporária que aparece na tela dentro do seu app, some sozinha depois de 2 ou 3 segundos, e não pode ser clicada nem fica guardada em lugar nenhum
+
+Onde posso configurar como os logs são filtrados no Logcat?
+R: No Android Studio, os filtros ficam na própria janela do Logcat (aba “Logcat” na parte de baixo do Android Studio). Em cima da lista de logs tem uma barra de busca/filtro e, ao lado, um seletor do nível do log.
+
+## 1. Qual o papel do `Intent`?
+
+O `Intent` é uma **mensagem de pedido** que você entrega ao sistema Android a dizer "quero fazer isto". Nesta aplicação tem dois papéis:
+
+- **Iniciar a `DisplayMessageActivity`:** `Intent(context, DisplayMessageActivity::class.java)` diz ao Android qual Activity abrir (é um Intent *explícito*, porque nomeia a classe de destino).
+- **Transportar dados entre as duas Activities:** `putExtra("EXTRA_MESSAGE", text)` anexa o texto digitado ao Intent, e na outra Activity `intent.getStringExtra("EXTRA_MESSAGE")` recupera esse valor.
+
+As Activities não se chamam diretamente umas às outras; passam sempre pelo sistema através de Intents.
+
+
+## 2. Qual o papel de `remember` e `mutableStateOf`?
+
+```kotlin
+var text by remember { mutableStateOf("") }
+```
+
+- **`mutableStateOf("")`** cria um **estado observável**, com valor inicial vazio. Quando o valor muda, o Compose sabe que as partes da UI que o leem estão desatualizadas e **recompõe** (redesenha) essas partes. Uma variável normal (`var text = ""`) não faria isso: o texto mudaria, mas a tela não.
+- **`remember`** **guarda o valor entre recomposições**. Como o composable é executado de novo a cada recomposição, sem `remember` o estado seria recriado como `""` a cada vez, e o que o usuário digitou desapareceria.
+
+Juntos: o `mutableStateOf` faz a UI reagir às mudanças e o `remember` impede que o valor se perca. No `OutlinedTextField`, cada tecla chama `onValueChange`, que atualiza `text`, que provoca a recomposição e mostra o novo texto.
+
+(Nota: `remember` não sobrevive à rotação do ecrã; para isso existe `rememberSaveable`.)
+
+## 3. Porquê o `LocalContext.current` para iniciar uma Activity?
+
+Porque `startActivity()` é um método do **`Context`**, e o construtor do `Intent` também exige um `Context` como primeiro parâmetro:
+
+```kotlin
+Intent(context, DisplayMessageActivity::class.java)
+context.startActivity(intent)
+```
+
+O `Context` representa o app/ecrã atual e diz ao Android **de onde** vem o pedido e a quem pertence (pacote, tarefa, back stack). Sem ele, o sistema não sabe quem está a pedir nem como resolver a classe de destino.
+
+Uma função `@Composable` é só uma função solta e **não tem um `this` que seja Context**, ao contrário de uma Activity. O `LocalContext.current` é a forma de o Compose lhe entregar o Context da Activity que está a hospedar a UI.
+
+Nota: no seu código, o `App()` está dentro da classe `MainActivity`, então tecnicamente poderia usar `this@MainActivity`. Mas `LocalContext.current` é a prática correta, porque funciona em qualquer composable, esteja ou não dentro de uma Activity.
+
+
+2.1 Como seria essa mesma lógica em Java? O que significa ?.split() ? O que faz o operador ?:?
+?.split(" ") (safe call)
+
+O ?. é o operador de chamada segura. Se message for null, ele não chama o split e o resultado da expressão inteira é null. Se message não for null, chama split(" ") normalmente e devolve a lista de palavras.
+
+Em Kotlin, message aqui é do tipo String? (pode ser nulo), então chamar message.split(" ") diretamente nem compilaria. O ?. resolve isso sem lançar NullPointerException.
+
+?: (operador Elvis)
+
+O ?: diz: “se o lado esquerdo for null, use o lado direito”.
+
+kotlin
+val words = message?.split(" ") ?: listOf()
+
+Lendo por partes:
+
+message?.split(" ") devolve a lista de palavras, ou null se message for null.
+?: listOf() troca esse null por uma lista vazia.
+
+2.2  Porque é que maxByOrNull é preferido a maxBy em Kotlin? O que faz ?: "Não disponível"?
+R:Porque é que maxByOrNull é preferido a maxBy?
+
+Porque lida com listas vazias de forma segura.
+
+maxByOrNull { ... } devolve o elemento máximo, ou null se a lista estiver vazia. Nunca rebenta.
+maxBy { ... } (na sua versão clássica) lança uma NoSuchElementException se a lista estiver vazia, e a app crasharia.
+
+2.3 
+R: A função lambda passada ao método filter possui o tipo (String) -> Boolean, pois recebe uma palavra do tipo String e devolve um valor booleano (true ou false), indicando se a palavra deve ou não permanecer na lista. A principal diferença entre uma lambda em Kotlin e uma classe anónima em Java está na simplicidade e concisão da sintaxe. As lambdas permitem representar funções de forma mais simples e direta, enquanto as classes anónimas exigem a criação de uma implementação de uma interface ou classe sem atribuir um nome a essa classe.
+
+O onCheckedChange é o callback que o Compose chama quando o usuário toca no checkbox. Ele recebe o novo valor que o usuário quer (true ou false) e é a sua vez de decidir o que fazer com ele.
+
+O que cada parte faz
+kotlin
+onCheckedChange = { tasks[index] = task.copy(isDone = it) }
+
+it: o novo valor do checkbox. Se estava desmarcado e o usuário tocou, it vale true. Se estava marcado, it vale false.
+
+task.copy(isDone = it): cria uma cópia da tarefa, igual à original (mesmo title), mas com isDone trocado pelo novo valor. Como o Task é imutável (val), não dá para alterar o original, então se cria uma cópia nova.
+
+tasks[index] = ...: coloca essa cópia no lugar da tarefa antiga, na posição index da lista.
+
